@@ -15,31 +15,30 @@ CLEAN=$SCRIPTS/training/clean-corpus-n.perl
 BPEROOT=subword-nmt
 BPE_TOKENS=10000
 
-URL="https://wit3.fbk.eu/archive/2014-01/texts/de/en/de-en.tgz"
-GZ=de-en.tgz
+GZ=tr-en.tgz
 
 if [ ! -d "$SCRIPTS" ]; then
     echo "Please set SCRIPTS variable correctly to point to Moses scripts."
     exit
 fi
 
-src=de
+src=tr
 tgt=en
-lang=de-en
-prep=iwslt14.tokenized.de-en
+lang=$src-$tgt
+prep=iwslt14.tokenized.$lang
 tmp=$prep/tmp
 orig=orig
 
 mkdir -p $orig $tmp $prep
 
-echo "Downloading data from ${URL}..."
+# echo "Downloading data from ${URL}..."
 cd $orig
-wget "$URL"
+# wget "$URL"
 
 if [ -f $GZ ]; then
-    echo "Data successfully downloaded."
+    echo "Original data available."
 else
-    echo "Data not successfully downloaded."
+    echo "Data missing. Please add tar file in $orig folder"
     exit
 fi
 
@@ -62,7 +61,8 @@ for l in $src $tgt; do
     perl $TOKENIZER -threads 8 -l $l > $tmp/$tok
     echo ""
 done
-perl $CLEAN -ratio 1.5 $tmp/train.tags.$lang.tok $src $tgt $tmp/train.tags.$lang.clean 1 175
+# Clean by ration 9 and remove sentences of length more than 175
+perl $CLEAN -ratio 9 $tmp/train.tags.$lang.tok $src $tgt $tmp/train.tags.$lang.clean 1 175
 for l in $src $tgt; do
     perl $LC < $tmp/train.tags.$lang.clean.$l > $tmp/train.tags.$lang.$l
 done
@@ -86,19 +86,18 @@ done
 
 echo "creating train, valid, test..."
 for l in $src $tgt; do
-    awk '{if (NR%23 == 0)  print $0; }' $tmp/train.tags.de-en.$l > $tmp/valid.$l
-    awk '{if (NR%23 != 0)  print $0; }' $tmp/train.tags.de-en.$l > $tmp/train.$l
+    awk '{if (NR%23 == 0)  print $0; }' $tmp/train.tags.$src-$tgt.$l > $tmp/valid.$l
+    awk '{if (NR%23 != 0)  print $0; }' $tmp/train.tags.$src-$tgt.$l > $tmp/train.$l
 
-    cat $tmp/IWSLT14.TED.dev2010.de-en.$l \
-        $tmp/IWSLT14.TEDX.dev2012.de-en.$l \
-        $tmp/IWSLT14.TED.tst2010.de-en.$l \
-        $tmp/IWSLT14.TED.tst2011.de-en.$l \
-        $tmp/IWSLT14.TED.tst2012.de-en.$l \
+    cat $tmp/IWSLT14.TED.dev2010.$src-$tgt.$l \
+        $tmp/IWSLT14.TED.tst2010.$src-$tgt.$l \
+        $tmp/IWSLT14.TED.tst2011.$src-$tgt.$l \
+        $tmp/IWSLT14.TED.tst2012.$src-$tgt.$l \
         > $tmp/test.$l
 done
 
-TRAIN=$tmp/train.en-de
-BPE_CODE=$prep/code
+TRAIN=$tmp/train.$lang
+BPE_CODE=$prep/bpe_code
 rm -f $TRAIN
 for l in $src $tgt; do
     cat $tmp/train.$l >> $TRAIN
@@ -108,8 +107,22 @@ echo "learn_bpe.py on ${TRAIN}..."
 python $BPEROOT/learn_bpe.py -s $BPE_TOKENS < $TRAIN > $BPE_CODE
 
 for L in $src $tgt; do
-    for f in train.$L valid.$L test.$L; do
+    for f in train.$L; do
         echo "apply_bpe.py to ${f}..."
-        python $BPEROOT/apply_bpe.py -c $BPE_CODE < $tmp/$f > $prep/$f
+        python $BPEROOT/apply_bpe.py -c $BPE_CODE < $tmp/$f > $prep/train.bpe.$L
     done
+    for f in valid.$L ; do
+        echo "apply_bpe.py to ${f}..."
+        python $BPEROOT/apply_bpe.py -c $BPE_CODE < $tmp/$f > $prep/valid.bpe.$L
+    done
+    for f in test.$L; do
+        echo "apply_bpe.py to ${f}..."
+        python $BPEROOT/apply_bpe.py -c $BPE_CODE < $tmp/$f > $prep/test.bpe.$L
+    done
+done
+
+for l in $src $tgt; do
+    mv $tmp/train.$l $prep/
+    mv $tmp/valid.$l $prep/
+    mv $tmp/test.$l $prep/
 done
