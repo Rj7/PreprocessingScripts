@@ -26,7 +26,7 @@ fi
 src=tr
 tgt=en
 lang=$src-$tgt
-prep=iwslt14.tokenized.$lang
+prep=iwslt14_setimes_$lang
 tmp=$prep/tmp
 orig=orig
 
