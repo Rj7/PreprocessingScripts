@@ -16,6 +16,7 @@ BPEROOT=subword-nmt
 BPE_TOKENS=10000
 
 GZ=tr-en.tgz
+GZ1=en-tr.txt.zip
 
 if [ ! -d "$SCRIPTS" ]; then
     echo "Please set SCRIPTS variable correctly to point to Moses scripts."
@@ -43,14 +44,16 @@ else
 fi
 
 tar zxvf $GZ
+unzip $GZ1 -d $lang
 cd ..
 
 echo "pre-processing train data..."
 for l in $src $tgt; do
     f=train.tags.$lang.$l
+    f1=SETIMES2.en-tr.$l
     tok=train.tags.$lang.tok.$l
 
-    cat $orig/$lang/$f | \
+    cat $orig/$lang/$f $orig/$lang/$f1 | \
     grep -v '<url>' | \
     grep -v '<talkid>' | \
     grep -v '<keywords>' | \
